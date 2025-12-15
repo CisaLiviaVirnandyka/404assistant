@@ -15,13 +15,23 @@ client.once(Events.ClientReady, () => {
 });
 
 const WELCOME_MESSAGES = [
-  (m, g) => `eh halo ${m}! 👋 selamat bergabung yaaa. ${g} jadi makin rame nih ada kamu. have fun dan semoga harimu menyenangkan! 💫`,
-  (m, g) => `knock knock! ada ${m} dateng nih! 🚪 selamat datang di ${g} bestie! jangan lupa say hi di chat yaaa! 🌈`,
-  (m, g) => `waaah ada temen baru! halo ${m}, salken yaaa! 🥰 jangan malu-malu buat ngobrol di chat umum. we are happy to have you! 💖`,
-  (m, g) => `hi hi ${m}! akhirnya dateng juga! 🥳 yuk kenalan sama yang lain. kalo butuh bantuan, jangan ragu buat tanya-tanya admin ya! 💕`,
-  (m, g) => `yey! ${m} sudah mendarat di ${g}! 🚀 selamat bergabung! semoga kita bisa jadi temen baik yaaa! 🌙`,
-  (m, g) => `halo ${m}, selamat datang! 🌷 ih seneng deh nambah member baru. semoga kamu nyaman main di ${g} yaaa! ✨`,
-  (m, g) => `welcome home ${m}! 🏡 makasih banyak udah mampir ke ${g}. yuk langsung seru-seruan bareng kita! jangan lupa baca rules dulu ya cantik/ganteng! 🎀`,
+  (m, g) => `✨ sebuah jiwa baru telah melintasi gerbang. selamat datang ${m}, di ${g}. semoga perjalananmu di realm ini menyenangkan dan penuh cerita. 🌙`,
+  (m, g) => `🔮 gerbang terbuka… ${m} telah tiba. selamat datang di ${g}. silakan jelajahi, berkenalan, dan temukan tempatmu di antara kami. ✨`,
+  (m, g) => `🌌 angin membawa kehadiran baru. halo ${m}, selamat datang di ${g}. semoga kamu menemukan teman, cerita, dan kenyamanan di sini. 🕯️`,
+  (m, g) => `✨ sebuah langkah baru memasuki realm. ${m}, selamat datang di ${g}. jangan ragu menyapa dan bergabung dengan percakapan. 🌿`,
+  (m, g) => `🌙 takdir mempertemukan kita hari ini. selamat datang ${m}, di ${g}. semoga perjalananmu di sini berjalan tenang dan menyenangkan. ✨`,
+  (m, g) => `🔮 cahaya gerbang menyambutmu, ${m}. selamat datang di ${g}. semoga kamu merasa diterima dan betah di dalam realm ini. 🌌`,
+  (m, g) => `🕯️ sebuah jiwa baru tiba di ambang gerbang. selamat datang ${m}, di ${g}. luangkan waktu untuk membaca aturan, lalu nikmati perjalananmu bersama kami. ✨`,
+  (m, g) => `🌠 bisikan takdir membawa ${m} ke dalam ${g}. selamat datang, semoga langkahmu di sini penuh kehangatan dan cerita. ✨`,
+  (m, g) => `🕯️ cahaya lembut dari gerbang menyambutmu, ${m}. selamat datang di ${g}. semoga kamu menemukan tempat yang nyaman di antara kami. 🌿`,
+  (m, g) => `🌙 di bawah naungan bintang, ${m} melangkah ke ${g}. selamat datang, semoga perjalananmu di realm ini berjalan indah. ✨`,
+  (m, g) => `🔮 sebuah kehadiran baru terukir dalam catatan realm. selamat datang ${m}, di ${g}. nikmati waktu dan kebersamaan di sini. 🌌`,
+  (m, g) => `✨ gerbang berpendar pelan saat ${m} tiba. selamat datang di ${g}. semoga setiap langkahmu di sini terasa menyenangkan. 🌿`,
+  (m, g) => `🌠 takdir menuntun langkahmu ke ${g}, ${m}. selamat datang, semoga kamu merasa diterima dan betah di dalam realm ini. ✨`,
+  (m, g) => `🕯️ jejak baru tercipta di ambang gerbang. selamat datang ${m}, di ${g}. luangkan waktu untuk mengenal, lalu jelajahi bersama kami. 🌙`,
+  (m, g) => `🔮 aliran waktu membawa ${m} memasuki ${g}. selamat datang, semoga perjalananmu dipenuhi hal-hal baik. ✨`,
+  (m, g) => `🌌 langit seakan berbisik saat ${m} tiba di ${g}. selamat datang, semoga kamu menemukan kenyamanan dan teman baru. 🌿`,
+  (m, g) => `✨ sebuah langkah tenang memasuki realm. ${m}, selamat datang di ${g}. kami menyambutmu dengan hangat. 🌙`,
 ];
 
 function getGeneralChannel(guild) {
@@ -64,7 +74,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       `hai **${interaction.user.username}**\nsantai aja, kamu udah di 404 society`,
       `halo **${interaction.user.username}** 👀\nnyasar? enggak kok, ini 404 society`,
       `yo **${interaction.user.username}** 😄\nwelcome to 404 society`,
-      `halo **${interaction.user.username}**\nrumahnya orang-orang yang “nggak ketemu”`,
+      `halo **${interaction.user.username}**\nini rumahnya orang-orang yang “nggak ketemu”`,
       `hai **${interaction.user.username}** ✨\n404 society selalu kebuka buat kamu`,
     ];
     const reply = replies[Math.floor(Math.random() * replies.length)];
