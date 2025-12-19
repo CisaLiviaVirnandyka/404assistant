@@ -1,0 +1,37 @@
+{
+  "users": {
+    "776022128092774410": {
+      "number": "4101766172197811",
+      "createdAt": 1766172197811,
+      "name": "cyizzie",
+      "gender": "w",
+      "domisili": "w",
+      "hobi": "w",
+      "status": "w",
+      "theme": "light",
+      "updatedAt": 1766175924408
+    },
+    "1284795073778683940": {
+      "number": "9401766172271809",
+      "createdAt": 1766172271809,
+      "name": "masdan nasi Padang",
+      "gender": "L",
+      "domisili": "Jawa",
+      "hobi": "mole",
+      "status": "single",
+      "theme": "light",
+      "updatedAt": 1766172271809
+    },
+    "455265677444644876": {
+      "number": "8761766172811684",
+      "createdAt": 1766172811685,
+      "name": "cyizzie",
+      "gender": "w",
+      "domisili": "sumatera",
+      "hobi": "baca",
+      "status": "kepo",
+      "theme": "light",
+      "updatedAt": 1766175082647
+    }
+  }
+}
