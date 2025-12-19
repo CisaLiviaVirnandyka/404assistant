@@ -39,6 +39,25 @@ const { createCanvas, loadImage } = require("canvas");
 const BRAND_NAME = "HOV Assistant";
 const ID_CARD_TITLE = "HOV IDENTITY CARD";
 
+// ===================== FONT (FIX TOFU) =====================
+// WAJIB: taro font di assets/fonts
+// Inter recommended:
+// - assets/fonts/Inter-Regular.ttf
+// - assets/fonts/Inter-Bold.ttf
+const FONT_REG = path.join(__dirname, "assets", "fonts", "Inter-Regular.ttf");
+const FONT_BOLD = path.join(__dirname, "assets", "fonts", "Inter-Bold.ttf");
+
+function registerFontsSafe() {
+  try {
+    if (fs.existsSync(FONT_REG)) registerFont(FONT_REG, { family: "Inter", weight: "400" });
+    if (fs.existsSync(FONT_BOLD)) registerFont(FONT_BOLD, { family: "Inter", weight: "700" });
+    console.log("[FONT] Loaded Inter fonts.");
+  } catch (e) {
+    console.warn("[FONT] Failed to register fonts, fallback to system fonts.", e?.message || e);
+  }
+}
+registerFontsSafe();
+
 // ===================== CLIENT =====================
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
