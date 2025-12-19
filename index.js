@@ -593,7 +593,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setCustomId("hobi")
           .setLabel("Hobi")
           .setStyle(TextInputStyle.Short)
-          .setMaxLength(24)
+          .setMaxLength(30)
           .setRequired(true);
 
         const statusInput = new TextInputBuilder()

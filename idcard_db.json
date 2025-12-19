@@ -4,12 +4,12 @@
       "number": "4101766172197811",
       "createdAt": 1766172197811,
       "name": "cyizzie",
-      "gender": "w",
-      "domisili": "w",
-      "hobi": "w",
-      "status": "w",
-      "theme": "light",
-      "updatedAt": 1766175924408
+      "gender": "W",
+      "domisili": "sumatera",
+      "hobi": "baca manhwa",
+      "status": "kepo",
+      "theme": "dark",
+      "updatedAt": 1766176686799
     },
     "1284795073778683940": {
       "number": "9401766172271809",
@@ -32,6 +32,39 @@
       "status": "kepo",
       "theme": "light",
       "updatedAt": 1766175082647
+    },
+    "1373732324109189195": {
+      "number": "1951766176856194",
+      "createdAt": 1766176856194,
+      "name": "miyuell",
+      "gender": "P",
+      "domisili": "kayangan",
+      "hobi": "yap",
+      "status": "villain imut",
+      "theme": "light",
+      "updatedAt": 1766176856194
+    },
+    "1429498649511067701": {
+      "number": "7011766176984887",
+      "createdAt": 1766176984887,
+      "name": "Bibil",
+      "gender": "L",
+      "domisili": "padang",
+      "hobi": "main hp",
+      "status": "single",
+      "theme": "light",
+      "updatedAt": 1766176984887
+    },
+    "633920703523061760": {
+      "number": "7601766177408316",
+      "createdAt": 1766177408316,
+      "name": "Ramzy L.Z",
+      "gender": "L",
+      "domisili": "Jakarta",
+      "hobi": "Mencoba hal baru",
+      "status": "Single",
+      "theme": "light",
+      "updatedAt": 1766177445194
     }
   }
 }

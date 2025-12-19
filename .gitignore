@@ -1,2 +1,12 @@
-node_modules
+# env
 .env
+
+# databases
+idcard_db.json
+menfess_db.json
+
+# node
+node_modules/
+
+# logs
+*.log
