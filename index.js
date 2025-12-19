@@ -1,14 +1,14 @@
 /**
  * index.js — HOV Assistant (Welcome + Menfess + HOV Identity Card)
- * ✅ discord.js v14
- * ✅ npm i discord.js dotenv canvas
+ * discord.js v14
+ * npm i discord.js dotenv canvas
  *
  * .env wajib:
  * DISCORD_TOKEN=xxxxx
  * GENERAL_CHANNEL_ID=xxxxx
  * MENFESS_CHANNEL_ID=xxxxx
  *
- * (Optional)
+ * optional:
  * MENFESS_COOLDOWN_SEC=60
  */
 
@@ -32,31 +32,28 @@ const {
   AttachmentBuilder,
 } = require("discord.js");
 
-// ✅ npm i canvas
-const { createCanvas, loadImage,registerFont } = require("canvas");
+const { createCanvas, loadImage, registerFont } = require("canvas");
 
 // ===================== BRAND =====================
 const BRAND_NAME = "HOV Assistant";
 const ID_CARD_TITLE = "HOV IDENTITY CARD";
 
-// ===================== FONT (FIX TOFU) =====================
-// WAJIB: taro font di assets/fonts
-// Inter recommended:
-// - assets/fonts/Inter-Regular.ttf
-// - assets/fonts/Inter-Bold.ttf
+// ===================== FONT =====================
+// pastikan file ini ADA:
+// assets/fonts/Inter-Regular.ttf
+// assets/fonts/Inter-Bold.ttf
 const FONT_REG = path.join(__dirname, "assets", "fonts", "Inter-Regular.ttf");
 const FONT_BOLD = path.join(__dirname, "assets", "fonts", "Inter-Bold.ttf");
 
-function registerFontsSafe() {
+(function registerFontsSafe() {
   try {
-    if (fs.existsSync(FONT_REG)) registerFont(FONT_REG, { family: "Inter", weight: "400" });
-    if (fs.existsSync(FONT_BOLD)) registerFont(FONT_BOLD, { family: "Inter", weight: "700" });
+    if (fs.existsSync(FONT_REG)) registerFont(FONT_REG, { family: "Inter", weight: "normal" });
+    if (fs.existsSync(FONT_BOLD)) registerFont(FONT_BOLD, { family: "Inter", weight: "bold" });
     console.log("[FONT] Loaded Inter fonts.");
   } catch (e) {
     console.warn("[FONT] Failed to register fonts, fallback to system fonts.", e?.message || e);
   }
-}
-registerFontsSafe();
+})();
 
 // ===================== CLIENT =====================
 const client = new Client({
@@ -79,20 +76,23 @@ function safeText(s, max = 32) {
     .slice(0, max);
 }
 
-// ===================== WELCOME =====================
+// ===================== WELCOME (lebih banyak & beda) =====================
 const WELCOME_MESSAGES = [
-  (m, g) =>
-    `✨ sebuah jiwa baru telah melintasi gerbang. selamat datang ${m}, di ${g}. semoga perjalananmu di realm ini menyenangkan dan penuh cerita. 🌙`,
-  (m, g) =>
-    `🔮 gerbang terbuka… ${m} telah tiba. selamat datang di ${g}. silakan jelajahi, berkenalan, dan temukan tempatmu di antara kami. ✨`,
-  (m, g) =>
-    `🌌 angin membawa kehadiran baru. halo ${m}, selamat datang di ${g}. semoga kamu menemukan teman, cerita, dan kenyamanan di sini. 🕯️`,
-  (m, g) =>
-    `✨ sebuah langkah baru memasuki realm. ${m}, selamat datang di ${g}. jangan ragu menyapa dan bergabung dengan percakapan. 🌿`,
-  (m, g) =>
-    `🌙 takdir mempertemukan kita hari ini. selamat datang ${m}, di ${g}. semoga perjalananmu di sini berjalan tenang dan menyenangkan. ✨`,
-  (m, g) =>
-    `🕯️ sebuah jiwa baru tiba di ambang gerbang. selamat datang ${m}, di ${g}. luangkan waktu untuk membaca aturan, lalu nikmati perjalananmu bersama kami. ✨`,
+  (m, g) => `✨ gerbang berpendar pelan… ${m} kini terdaftar di ${g}. selamat datang dan semoga betah. 🌙`,
+  (m, g) => `🔮 sebuah nama baru tertulis di arsip. selamat datang ${m} di ${g}. jangan ragu menyapa ya. ✨`,
+  (m, g) => `🕯️ cahaya lilin menyambut langkahmu, ${m}. selamat datang di ${g}. semoga harimu hangat. 🌿`,
+  (m, g) => `🌌 angin malam membawa kabar: ${m} tiba di ${g}. jelajahi realm ini dengan tenang. ✨`,
+  (m, g) => `🌙 takdir mempertemukan kita. selamat datang ${m} di ${g}. semoga menemukan teman dan cerita. 🔮`,
+  (m, g) => `✨ gerbang terbuka. ${m} masuk ke ${g}. baca aturan dulu, lalu mari bersenang-senang. 🕯️`,
+  (m, g) => `🪄 sihir kecil menyapa: halo ${m}! selamat datang di ${g}. semoga nyaman di sini. 🌙`,
+  (m, g) => `🌠 bintang mencatat kedatanganmu. ${m}, selamat datang di ${g}. ayo kenalan pelan-pelan. ✨`,
+  (m, g) => `🔮 aura baru terdeteksi… ${m} telah tiba di ${g}. semoga harimu penuh hal baik. 🌿`,
+  (m, g) => `🕯️ langkahmu resmi di realm ini, ${m}. selamat datang di ${g}. nikmati setiap percakapan. ✨`,
+  (m, g) => `🌌 pintu dimensi terbuka—${m} mendarat di ${g}. jangan sungkan untuk gabung obrolan. 🌙`,
+  (m, g) => `✨ halo ${m}! selamat datang di ${g}. kalau bingung mulai dari mana, ketik /halo ya. 🔮`,
+  (m, g) => `🌙 sebuah jiwa baru bergabung: ${m}. selamat datang di ${g}. semoga betah dan aman. 🕯️`,
+  (m, g) => `🔮 arsip diperbarui. ${m}, selamat datang di ${g}. semoga menemukan tempatmu di sini. ✨`,
+  (m, g) => `🌿 selamat datang ${m} di ${g}. di sini kita ngobrol santai, tapi tetap sopan ya. 🕯️`,
 ];
 
 // ===================== MENFESS DB =====================
@@ -167,14 +167,14 @@ async function renderIdCard({
   const line = isDark ? "rgba(255,255,255,.12)" : "rgba(0,0,0,.10)";
   const accent = isDark ? "#a78bfa" : "#8b5cf6";
 
-  // BG
+  // BG gradient
   const grad = ctx.createLinearGradient(0, 0, w, h);
   grad.addColorStop(0, bg1);
   grad.addColorStop(1, bg2);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
 
-  // glow
+  // glow orbs
   ctx.globalAlpha = 0.28;
   const glow = (x, y, r, color) => {
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -203,10 +203,7 @@ async function renderIdCard({
 
   // panel
   const pad = 34;
-  const x = pad,
-    y = pad,
-    cw = w - pad * 2,
-    ch = h - pad * 2;
+  const x = pad, y = pad, cw = w - pad * 2, ch = h - pad * 2;
 
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,.35)";
@@ -226,13 +223,14 @@ async function renderIdCard({
 
   // header
   ctx.fillStyle = ink;
-  ctx.font = "700 48px Inter";
-  ctx.fillText(`HOV IDENTITY CARD`, x + 34, y + 82);
+  ctx.font = "bold 46px Inter, Arial";
+  ctx.fillText("HOV IDENTITY CARD", x + 34, y + 82);
 
   ctx.fillStyle = subInk;
-  ctx.font = "600 20px Inter";
-  ctx.fillText("House of Valeria • Verified in the Arcane", x + 36, y + 114);
+  ctx.font = "600 20px Inter, Arial";
+  ctx.fillText("Arcane Registry • Verified in the realm", x + 36, y + 114);
 
+  // divider
   ctx.strokeStyle = line;
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -248,11 +246,11 @@ async function renderIdCard({
   const drawRow = (label, value, i) => {
     const yy = topListY + i * rowGap;
     ctx.fillStyle = subInk;
-    ctx.font = "700 18px Inter";
+    ctx.font = "700 18px Inter, Arial";
     ctx.fillText(label, lx, yy);
 
     ctx.fillStyle = ink;
-    ctx.font = "700 22px Inter";
+    ctx.font = "700 22px Inter, Arial";
     ctx.fillText(value, lx + 210, yy);
   };
 
@@ -263,9 +261,15 @@ async function renderIdCard({
   drawRow("Hobi", hobi, 4);
   drawRow("Status", status, 5);
 
+  // tagline (posisi rapi di bawah list kiri)
+  const taglineY = topListY + 6 * rowGap + 22; // setelah row terakhir
+  ctx.fillStyle = subInk;
+  ctx.font = "600 18px Inter, Arial";
+  ctx.fillText("terdaftar sebagai jiwa sah di realm HOV", lx, taglineY);
+
   // footer left
   ctx.fillStyle = subInk;
-  ctx.font = "600 16px Inter";
+  ctx.font = "600 16px Inter, Arial";
   ctx.fillText(`© HOV • ${BRAND_NAME}`, x + 36, y + ch - 28);
 
   // right avatar
@@ -292,13 +296,13 @@ async function renderIdCard({
     ctx.fill();
   }
 
-  // ✅ tanggal (naik, tanpa quotes)
+  // tanggal (di bawah avatar, naik dikit, ukuran pas)
   const cx = px + pw / 2;
-  const dateTop = py + ph + 20;
+  const dateTop = py + ph + 14; // lebih naik dari sebelumnya
 
   ctx.textAlign = "center";
   ctx.fillStyle = subInk;
-  ctx.font = "700 16px Inter";
+  ctx.font = "700 16px Inter, Arial";
   ctx.fillText("🕰️ Tanggal Dibuat", cx, dateTop);
 
   ctx.strokeStyle = line;
@@ -309,11 +313,10 @@ async function renderIdCard({
   ctx.stroke();
 
   ctx.fillStyle = ink;
-  ctx.font = "700 48px Inter";
+  ctx.font = "700 20px Inter, Arial";
   ctx.fillText(createdAtText, cx, dateTop + 38);
 
   ctx.textAlign = "left";
-
   return canvas.toBuffer("image/png");
 }
 
@@ -349,11 +352,11 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
   const mention = `<@${member.id}>`;
   const guildName = `**${member.guild.name}**`;
-  const msg =
-    WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)](
-      mention,
-      guildName
-    );
+
+  const msg = WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)](
+    mention,
+    guildName
+  );
 
   channel.send(msg).catch(console.error);
 });
@@ -361,14 +364,12 @@ client.on(Events.GuildMemberAdd, async (member) => {
 // ===================== INTERACTIONS =====================
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
-    // -------- SLASH COMMANDS --------
+    // ============ SLASH ============
     if (interaction.isChatInputCommand()) {
       const name = interaction.commandName;
 
-      // ping
       if (name === "ping") return interaction.reply(`🏓 pong! ${client.ws.ping}ms`);
 
-      // halo
       if (name === "halo") {
         const serverName = interaction.guild?.name || "realm ini";
         const replies = [
@@ -376,13 +377,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
           `🌙 gerbang berpendar pelan saat **${interaction.user.username}** berbicara.\nselamat datang di **${serverName}**.`,
           `🔮 suaramu menggema di dalam **${serverName}**, **${interaction.user.username}**.\nsemoga langkahmu di sini menyenangkan.`,
           `🕯️ salam hangat, **${interaction.user.username}**.\n**${serverName}** menyambut kehadiranmu.`,
-          `🌌 sebuah sapaan sederhana membuka percakapan.\nselamat datang **${interaction.user.username}** di **${serverName}**.`,
-          `✨ cahaya lembut menyertai salam darimu.\n**${serverName}** selalu terbuka untukmu, **${interaction.user.username}**.`,
         ];
         return interaction.reply(replies[Math.floor(Math.random() * replies.length)]);
       }
 
-      // about
       if (name === "about") {
         const uptime = Math.floor(process.uptime());
         const hours = Math.floor(uptime / 3600);
@@ -405,7 +403,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ embeds: [embed] });
       }
 
-      // userinfo (yang kamu bilang ilang)
       if (name === "userinfo") {
         const user = interaction.options.getUser("user") || interaction.user;
         const member = interaction.guild?.members.cache.get(user.id) || null;
@@ -420,9 +417,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             .slice(0, 15) || [];
 
         const rolesText =
-          roles.length > 0
-            ? roles.join(" ") + (member.roles.cache.size - 1 > 15 ? " …" : "")
-            : "—";
+          roles.length > 0 ? roles.join(" ") + (member.roles.cache.size - 1 > 15 ? " …" : "") : "—";
 
         const embed = new EmbedBuilder()
           .setTitle(`👤 User Info — ${user.username}`)
@@ -439,19 +434,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ embeds: [embed] });
       }
 
-      // serverinfo
       if (name === "serverinfo") {
         const g = interaction.guild;
         if (!g) return interaction.reply({ content: "Ini cuma bisa dipakai di server ya 👀", ephemeral: true });
 
         const owner = await g.fetchOwner().catch(() => null);
-
         const channels = g.channels.cache;
         const textCount = channels.filter((c) => c.isTextBased()).size;
-        const voiceCount = channels.filter((c) => c.isVoiceBased?.() || c.type === 2).size;
-
-        const boosts = g.premiumSubscriptionCount || 0;
-        const boostTier = g.premiumTier ?? 0;
 
         const embed = new EmbedBuilder()
           .setTitle(`🏰 Server Info — ${g.name}`)
@@ -459,22 +448,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .addFields(
             { name: "👑 Owner", value: owner ? `<@${owner.id}>` : "Unknown", inline: true },
             { name: "👥 Members", value: `${g.memberCount}`, inline: true },
-            { name: "💎 Boost", value: `Tier ${boostTier} • ${boosts} boosts`, inline: true },
-            { name: "💬 Channels", value: `Text: ${textCount}\nVoice: ${voiceCount}\nTotal: ${channels.size}`, inline: true },
+            { name: "💬 Text Channels", value: `${textCount}`, inline: true },
             { name: "🎭 Roles", value: `${g.roles.cache.size}`, inline: true },
-            { name: "✅ Verification", value: `${g.verificationLevel}`, inline: true },
             { name: "📅 Created", value: `<t:${Math.floor(g.createdTimestamp / 1000)}:F>`, inline: false }
           )
           .setFooter({ text: `Server ID: ${g.id}` })
           .setTimestamp();
 
-        const banner = g.bannerURL?.({ size: 1024 });
-        if (banner) embed.setImage(banner);
-
         return interaction.reply({ embeds: [embed] });
       }
 
-      // menfess panel (admin)
       if (name === "menfesspanel") {
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
           return interaction.reply({ content: "command ini cuma buat admin ya 👀", ephemeral: true });
@@ -500,12 +483,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ content: "✅ panel menfess terkirim ke channel menfess.", ephemeral: true });
       }
 
-      // idcard panel
       if (name === "idcard") {
         const embed = new EmbedBuilder()
           .setTitle(`🪪 ${ID_CARD_TITLE}`)
           .setDescription("Klik tombol untuk membuat / update **HOV IDENTITY CARD** kamu.")
-          .setFooter({ text: "Theme: ketik di Status pakai `| dark` atau `| light`" });
+          .setFooter({ text: "Theme: isi Status pakai `| dark` atau `| light` (contoh: single | dark)" });
 
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
@@ -517,12 +499,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         return interaction.reply({ embeds: [embed], components: [row] });
       }
+
+      return;
     }
 
-    // -------- BUTTONS --------
+    // ============ BUTTON ============
     if (interaction.isButton()) {
-      // menfess new
-      if (interaction.customId === "menfess:new") {
+      const id = interaction.customId;
+
+      // --- MENFESS NEW
+      if (id === "menfess:new") {
         const cdSec = Number(process.env.MENFESS_COOLDOWN_SEC || 60);
         const now = Date.now();
         const last = menfessCooldown.get(interaction.user.id) || 0;
@@ -564,9 +550,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.showModal(modal);
       }
 
-      // menfess reply
-      if (interaction.customId.startsWith("menfess:reply:")) {
-        const menfessId = interaction.customId.split(":")[2];
+      // --- MENFESS REPLY
+      if (id.startsWith("menfess:reply:")) {
+        const menfessId = id.split(":")[2];
 
         const modal = new ModalBuilder()
           .setCustomId(`menfess:reply_submit:${menfessId}`)
@@ -583,8 +569,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.showModal(modal);
       }
 
-      // idcard open
-      if (interaction.customId === "idcard:open") {
+      // --- ID CARD OPEN
+      if (id === "idcard:open") {
         const modal = new ModalBuilder().setCustomId("idcard:submit").setTitle(`🪪 ${ID_CARD_TITLE}`);
 
         const nameInput = new TextInputBuilder()
@@ -632,12 +618,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         return interaction.showModal(modal);
       }
+
+      return;
     }
 
-    // -------- MODALS --------
+    // ============ MODAL ============
     if (interaction.isModalSubmit()) {
-      // menfess submit
-      if (interaction.customId === "menfess:submit") {
+      const id = interaction.customId;
+
+      // --- MENFESS SUBMIT
+      if (id === "menfess:submit") {
         const ch = getChannelById(interaction.guild, process.env.MENFESS_CHANNEL_ID);
         if (!ch) return interaction.reply({ content: "MENFESS_CHANNEL_ID belum valid di .env", ephemeral: true });
 
@@ -687,9 +677,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ content: "✅ menfess terkirim.", ephemeral: true });
       }
 
-      // menfess reply submit
-      if (interaction.customId.startsWith("menfess:reply_submit:")) {
-        const menfessId = interaction.customId.split(":")[2];
+      // --- MENFESS REPLY SUBMIT
+      if (id.startsWith("menfess:reply_submit:")) {
+        const menfessId = id.split(":")[2];
         const replyText = interaction.fields.getTextInputValue("reply_msg").trim();
         if (!replyText) return interaction.reply({ content: "Balasan kosong 😭", ephemeral: true });
 
@@ -719,8 +709,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ content: "✅ balasan terkirim.", ephemeral: true });
       }
 
-      // idcard submit
-      if (interaction.customId === "idcard:submit") {
+      // --- ID CARD SUBMIT
+      if (id === "idcard:submit") {
         const rawName = interaction.fields.getTextInputValue("name");
         const rawGender = interaction.fields.getTextInputValue("gender");
         const rawDom = interaction.fields.getTextInputValue("dom");
@@ -755,6 +745,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           year: "numeric",
         });
 
+        // IMPORTANT: modal submit -> langsung deferReply sekali, lalu editReply
         await interaction.deferReply({ ephemeral: false });
 
         const png = await renderIdCard({
@@ -785,6 +776,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
           components: [row],
         });
       }
+
+      return;
     }
   } catch (err) {
     console.error(err);
