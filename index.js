@@ -292,7 +292,7 @@ async function renderIdCard({
 
   // tanggal (di bawah avatar, naik dikit, ukuran pas)
   const cx = px + pw / 2;
-  const dateTop = py + ph + 14; // lebih naik dari sebelumnya
+  const dateTop = py + ph + 18; // lebih naik dari sebelumnya
 
   ctx.textAlign = "center";
   ctx.fillStyle = subInk;
