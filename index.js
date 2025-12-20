@@ -1,5 +1,5 @@
 /**
- * index.js — HOV Assistant (Welcome + Menfess + HOV Identity Card)
+ * index.js — HOV Assistant (Welcome + Menfess + HOV Identity Card + Registry + AFK + Avatar)
  * discord.js v14
  * npm i discord.js dotenv canvas
  *
@@ -7,6 +7,8 @@
  * DISCORD_TOKEN=xxxxx
  * GENERAL_CHANNEL_ID=xxxxx
  * MENFESS_CHANNEL_ID=xxxxx
+ * CLIENT_ID=xxxxx
+ * GUILD_ID=xxxxx
  *
  * optional:
  * MENFESS_COOLDOWN_SEC=60
@@ -60,7 +62,10 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
-    // NOTE: tidak perlu GuildMessages/MessageContent karena bot tidak baca chat.
+
+    // ✅ WAJIB untuk AFK (baca message + mention)
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
   ],
 });
 
@@ -94,7 +99,7 @@ function safeText(s, max = 32) {
     .slice(0, max);
 }
 
-// ===================== WELCOME (lebih banyak & beda) =====================
+// ===================== WELCOME =====================
 const WELCOME_MESSAGES = [
   (m, g) => `✨ gerbang berpendar pelan… ${m} kini terdaftar di ${g}. selamat datang dan semoga betah. 🌙`,
   (m, g) => `🔮 sebuah nama baru tertulis di arsip. selamat datang ${m} di ${g}. jangan ragu menyapa ya. ✨`,
@@ -157,6 +162,38 @@ function saveIdDB(db) {
 function genCardNumber(userId) {
   const raw = `${userId}${Date.now()}`.replace(/\D/g, "");
   return raw.slice(-16).padStart(16, "0");
+}
+
+// ===================== AFK DB =====================
+const AFK_DB_PATH = path.join(__dirname, "afk_db.json");
+
+function loadAfkDB() {
+  try {
+    return JSON.parse(fs.readFileSync(AFK_DB_PATH, "utf8"));
+  } catch {
+    return { users: {} };
+  }
+}
+function saveAfkDB(db) {
+  fs.writeFileSync(AFK_DB_PATH, JSON.stringify(db, null, 2), "utf8");
+}
+function setAfk(userId, reason) {
+  const db = loadAfkDB();
+  db.users[userId] = { reason: safeText(reason || "AFK", 80), since: Date.now() };
+  saveAfkDB(db);
+}
+function clearAfk(userId) {
+  const db = loadAfkDB();
+  if (db.users[userId]) {
+    delete db.users[userId];
+    saveAfkDB(db);
+    return true;
+  }
+  return false;
+}
+function getAfk(userId) {
+  const db = loadAfkDB();
+  return db.users[userId] || null;
 }
 
 // ===================== ID CARD RENDER =====================
@@ -301,7 +338,7 @@ async function renderIdCard({ theme, number, name, gender, domisili, hobi, statu
     ctx.fill();
   }
 
-  // tanggal (di bawah avatar, naik dikit, ukuran pas)
+  // tanggal
   const cx = px + pw / 2;
   const dateTop = py + ph + 18;
 
@@ -323,6 +360,66 @@ async function renderIdCard({ theme, number, name, gender, domisili, hobi, statu
 
   ctx.textAlign = "left";
   return canvas.toBuffer("image/png");
+}
+
+// ===================== REGISTRY HELPERS (No 13) =====================
+function buildRegistryPages(guild, idDb) {
+  const users = idDb?.users || {};
+
+  const list = Object.entries(users)
+    .map(([uid, data]) => ({
+      uid,
+      name: data?.name || "—",
+      createdAt: data?.createdAt || 0,
+    }))
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+  // kalau mau tampilkan yang sudah keluar server, hapus filter ini
+  const filtered = list.filter((x) => guild.members.cache.has(x.uid));
+
+  const pageSize = 10;
+  const pages = [];
+  for (let i = 0; i < filtered.length; i += pageSize) pages.push(filtered.slice(i, i + pageSize));
+  return pages.length ? pages : [[]];
+}
+
+function registryEmbed(guild, pages, pageIndex) {
+  const page = pages[pageIndex] || [];
+  const totalPages = pages.length;
+  const totalUsers = pages.flat().length;
+
+  const desc =
+    page.length === 0
+      ? "Belum ada warga yang terdaftar ID Card."
+      : page
+          .map((x, idx) => {
+            const num = pageIndex * 10 + idx + 1;
+            const dateUnix = x.createdAt ? Math.floor(x.createdAt / 1000) : null;
+            const dateText = dateUnix ? `<t:${dateUnix}:D>` : "—";
+            return `**${num}.** <@${x.uid}> • **${safeText(x.name, 24)}** • ${dateText}`;
+          })
+          .join("\n");
+
+  return new EmbedBuilder()
+    .setTitle("🗂️ HOV Registry — Warga Terdaftar")
+    .setDescription(desc)
+    .setFooter({ text: `Page ${pageIndex + 1} / ${totalPages} • Total: ${totalUsers}` })
+    .setTimestamp();
+}
+
+function registryRow(pageIndex, totalPages) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`registry:prev:${pageIndex}`)
+      .setLabel("Prev")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(pageIndex <= 0),
+    new ButtonBuilder()
+      .setCustomId(`registry:next:${pageIndex}`)
+      .setLabel("Next")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(pageIndex >= totalPages - 1)
+  );
 }
 
 // ===================== READY / PRESENCE =====================
@@ -355,6 +452,51 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
   const msg = WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)](mention, guildName);
   channel.send(msg).catch(console.error);
+});
+
+// ===================== AFK SYSTEM (Message Listener) =====================
+client.on(Events.MessageCreate, async (message) => {
+  try {
+    if (!message.guild) return;
+    if (message.author.bot) return;
+
+    // 1) kalau user yang AFK kirim pesan -> auto clear
+    const wasAfk = getAfk(message.author.id);
+    if (wasAfk) {
+      clearAfk(message.author.id);
+      await message
+        .reply({
+          content: `✅ welcome back <@${message.author.id}>! status AFK kamu sudah dihapus.`,
+          allowedMentions: { repliedUser: false },
+        })
+        .catch(() => {});
+    }
+
+    // 2) kalau message mention user AFK -> bot kasih notice
+    if (!message.mentions?.users?.size) return;
+
+    const lines = [];
+    for (const [uid, user] of message.mentions.users) {
+      if (user.bot) continue;
+      const afk = getAfk(uid);
+      if (!afk) continue;
+
+      const sinceUnix = Math.floor((afk.since || Date.now()) / 1000);
+      lines.push(`• <@${uid}> sedang **AFK** — ${afk.reason}\n  sejak <t:${sinceUnix}:R>`);
+      if (lines.length >= 5) break;
+    }
+
+    if (lines.length) {
+      await message
+        .reply({
+          content: `🕯️ **AFK Notice**\n${lines.join("\n")}`,
+          allowedMentions: { repliedUser: false },
+        })
+        .catch(() => {});
+    }
+  } catch (e) {
+    console.error("[AFK] error:", e);
+  }
 });
 
 // ===================== INTERACTIONS (SINGLE ROUTER) =====================
@@ -402,7 +544,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (name === "userinfo") {
         const user = interaction.options.getUser("user") || interaction.user;
 
-        // fetch member biar join date gak null walau gak kecache
         const member = interaction.guild ? await interaction.guild.members.fetch(user.id).catch(() => null) : null;
 
         const created = `<t:${Math.floor(user.createdTimestamp / 1000)}:F>`;
@@ -430,6 +571,48 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setTimestamp();
 
         return interaction.reply({ embeds: [embed] });
+      }
+
+      if (name === "avatar") {
+        const user = interaction.options.getUser("user") || interaction.user;
+        const member = interaction.guild ? await interaction.guild.members.fetch(user.id).catch(() => null) : null;
+
+        const globalAvatar = user.displayAvatarURL({ extension: "png", size: 1024 });
+        const serverAvatar = member?.avatarURL({ extension: "png", size: 1024 }) || null;
+
+        const embed = new EmbedBuilder()
+          .setTitle(`🖼️ Avatar — ${user.username}`)
+          .setDescription(serverAvatar ? "Menampilkan **Server Avatar** (kalau ada) + Global Avatar." : "Menampilkan **Global Avatar**.")
+          .setImage(serverAvatar || globalAvatar)
+          .addFields(
+            { name: "Global Avatar", value: globalAvatar, inline: false },
+            ...(serverAvatar ? [{ name: "Server Avatar", value: serverAvatar, inline: false }] : [])
+          )
+          .setTimestamp();
+
+        return interaction.reply({ embeds: [embed] });
+      }
+
+      if (name === "afk") {
+        const reason = interaction.options.getString("reason") || "AFK";
+        setAfk(interaction.user.id, reason);
+        return interaction.reply({
+          content: `🕯️ <@${interaction.user.id}> sekarang **AFK** — ${safeText(reason, 80)}`,
+          allowedMentions: { users: [interaction.user.id] },
+        });
+      }
+
+      if (name === "registry") {
+        if (!interaction.guild) return interaction.reply({ content: "Command ini cuma bisa dipakai di server ya.", ephemeral: true });
+
+        const idDb = loadIdDB();
+        const pages = buildRegistryPages(interaction.guild, idDb);
+        const pageIndex = 0;
+
+        const embed = registryEmbed(interaction.guild, pages, pageIndex);
+        const row = registryRow(pageIndex, pages.length);
+
+        return interaction.reply({ embeds: [embed], components: [row] });
       }
 
       if (name === "serverinfo") {
@@ -509,7 +692,27 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isButton()) {
       const id = interaction.customId;
 
-      // pakai ELSE IF chain biar showModal cuma kepanggil sekali
+      // Registry pagination
+      if (id.startsWith("registry:")) {
+        await interaction.deferUpdate();
+
+        const [, action, currentStr] = id.split(":"); // registry:prev:0
+        const current = Number(currentStr || 0);
+
+        const idDb = loadIdDB();
+        const pages = buildRegistryPages(interaction.guild, idDb);
+
+        let nextPage = current;
+        if (action === "prev") nextPage = Math.max(0, current - 1);
+        if (action === "next") nextPage = Math.min(pages.length - 1, current + 1);
+
+        const embed = registryEmbed(interaction.guild, pages, nextPage);
+        const row = registryRow(nextPage, pages.length);
+
+        return interaction.message.edit({ embeds: [embed], components: [row] });
+      }
+
+      // Menfess new
       if (id === "menfess:new") {
         const cdSec = Number(process.env.MENFESS_COOLDOWN_SEC || 60);
         const now = Date.now();
@@ -550,12 +753,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
         );
 
         return interaction.showModal(modal);
-      } else if (id.startsWith("menfess:reply:")) {
+      }
+
+      // Menfess reply
+      if (id.startsWith("menfess:reply:")) {
         const menfessId = id.split(":")[2];
 
-        const modal = new ModalBuilder()
-          .setCustomId(`menfess:reply_submit:${menfessId}`)
-          .setTitle(`🫣 Balas Anonim #${menfessId}`);
+        const modal = new ModalBuilder().setCustomId(`menfess:reply_submit:${menfessId}`).setTitle(`🫣 Balas Anonim #${menfessId}`);
 
         const reply = new TextInputBuilder()
           .setCustomId("reply_msg")
@@ -566,7 +770,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         modal.addComponents(new ActionRowBuilder().addComponents(reply));
         return interaction.showModal(modal);
-      } else if (id === "idcard:open") {
+      }
+
+      // ID Card open
+      if (id === "idcard:open") {
         const modal = new ModalBuilder().setCustomId("idcard:submit").setTitle(`🪪 ${ID_CARD_TITLE}`);
 
         const nameInput = new TextInputBuilder().setCustomId("name").setLabel("Nama").setStyle(TextInputStyle.Short).setMaxLength(24).setRequired(true);
@@ -607,14 +814,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isModalSubmit()) {
       const id = interaction.customId;
 
-      // --- MENFESS SUBMIT
+      // Menfess submit
       if (id === "menfess:submit") {
         const ch = await getChannelById(interaction.guild, process.env.MENFESS_CHANNEL_ID);
         if (!ch) {
-        console.warn("[MENFESS] Channel invalid saat interaction:", interaction.type);
-        return; // cukup stop, jangan ganggu user
-      }
-
+          return interaction.reply({
+            content: "Channel menfess tidak ketemu / bot tidak punya akses / bukan text channel.",
+            ephemeral: true,
+          });
+        }
 
         const to = interaction.fields.getTextInputValue("to_initial").trim();
         const aliasRaw = (interaction.fields.getTextInputValue("alias") || "").trim();
@@ -625,7 +833,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return interaction.reply({ content: "Nama tidak boleh mengandung mention / nyamar staff ya.", ephemeral: true });
         }
 
-        // cooldown diset di sini biar aman
         const cdSec = Number(process.env.MENFESS_COOLDOWN_SEC || 60);
         const now = Date.now();
         const last = menfessCooldown.get(interaction.user.id) || 0;
@@ -644,7 +851,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const embed = new EmbedBuilder()
           .setTitle(`🕯️ MENFESS #${menfessId}`)
-          .setDescription(`**untuk:** ${to}\n\n${content}\n\n— **${senderLabel}**`)
+          .setDescription(`**untuk:** ${safeText(to, 24)}\n\n${content}\n\n— **${safeText(senderLabel, 24)}**`)
           .setColor(0x8b5cf6)
           .setFooter({ text: `Posted by ${BRAND_NAME}` })
           .setTimestamp();
@@ -663,7 +870,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ content: "✅ menfess terkirim.", ephemeral: true });
       }
 
-      // --- MENFESS REPLY SUBMIT
+      // Menfess reply submit
       if (id.startsWith("menfess:reply_submit:")) {
         const menfessId = id.split(":")[2];
         const replyText = interaction.fields.getTextInputValue("reply_msg").trim();
@@ -695,7 +902,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ content: "✅ balasan terkirim.", ephemeral: true });
       }
 
-      // --- ID CARD SUBMIT
+      // ID Card submit
       if (id === "idcard:submit") {
         const rawName = interaction.fields.getTextInputValue("name");
         const rawGender = interaction.fields.getTextInputValue("gender");
