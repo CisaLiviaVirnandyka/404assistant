@@ -1,5 +1,5 @@
 /**
- * index.js — HOV Assistant
+ * index.js — HOV Assistant (FULL FIX)
  * (Welcome + Menfess + HOV Identity Card + Registry + AFK + Avatar + Sorting (IDCard-required) + HouseCard + /myhouse)
  * discord.js v14
  * npm i discord.js dotenv canvas
@@ -40,6 +40,7 @@ const {
   TextInputBuilder,
   TextInputStyle,
   AttachmentBuilder,
+  MessageFlags,
 } = require("discord.js");
 
 const { createCanvas, loadImage, registerFont } = require("canvas");
@@ -80,23 +81,6 @@ client.on("error", (err) => console.error("[client error]", err));
 // ===================== UTILS =====================
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function getChannelById(guild, id) {
-  if (!guild || !id) return null;
-
-  let ch = guild.channels.cache.get(id) || null;
-  if (!ch) {
-    try {
-      ch = await guild.channels.fetch(id);
-    } catch {
-      return null;
-    }
-  }
-
-  if (!ch) return null;
-  if (!ch.isTextBased()) return null;
-  return ch;
-}
-
 function safeText(s, max = 32) {
   return String(s || "")
     .replace(/[\r\n\t]/g, " ")
@@ -107,6 +91,53 @@ function safeText(s, max = 32) {
 function requireEnv(name) {
   const v = process.env[name];
   return v && String(v).trim().length ? String(v).trim() : null;
+}
+
+/**
+ * FIX: bikin fetch channel lebih jelas & bisa kasih alasan error
+ */
+async function getTextChannelOrExplain(guild, id) {
+  if (!guild || !id) return { ok: false, reason: "missing_guild_or_id" };
+
+  try {
+    const ch = await guild.channels.fetch(id);
+    if (!ch) return { ok: false, reason: "not_found" };
+    if (!ch.isTextBased?.()) return { ok: false, reason: "not_text_based", found: ch };
+    return { ok: true, channel: ch };
+  } catch (e) {
+    return { ok: false, reason: "fetch_failed", code: e?.code, message: e?.message };
+  }
+}
+
+/**
+ * FIX: cek role beneran ada (biar gak “padahal env udah diisi”)
+ */
+async function getRoleOrExplain(guild, roleId) {
+  if (!guild || !roleId) return { ok: false, reason: "missing_guild_or_id" };
+  try {
+    const role = await guild.roles.fetch(roleId);
+    if (!role) return { ok: false, reason: "role_not_found" };
+    return { ok: true, role };
+  } catch (e) {
+    return { ok: false, reason: "fetch_failed", code: e?.code, message: e?.message };
+  }
+}
+
+function explainChannelError(res) {
+  if (res.reason === "missing_guild_or_id") return "Guild/ID kosong atau dipakai bukan di server.";
+  if (res.reason === "not_text_based") return "ID yang kamu isi bukan text channel (mungkin category/voice/thread).";
+  if (res.code === 10003) return "Unknown Channel: ID salah / channel sudah dihapus lalu dibuat ulang.";
+  if (res.code === 50001) return "Missing Access: bot tidak punya akses (View Channel) ke channel itu.";
+  if (res.code === 50013) return "Missing Permissions: bot tidak punya izin yang cukup di channel itu.";
+  return `Gagal fetch channel (${res.code || "?"}): ${res.message || "unknown"}`;
+}
+
+function explainRoleError(res) {
+  if (res.reason === "missing_guild_or_id") return "Role ID kosong atau dipakai bukan di server.";
+  if (res.reason === "role_not_found") return "Role tidak ditemukan (ID salah / role dihapus lalu dibuat ulang).";
+  if (res.code === 50001) return "Missing Access: bot tidak punya akses untuk fetch role (jarang, tapi bisa).";
+  if (res.code === 50013) return "Missing Permissions: bot tidak punya izin yang cukup.";
+  return `Gagal fetch role (${res.code || "?"}): ${res.message || "unknown"}`;
 }
 
 // ===================== WELCOME =====================
@@ -293,7 +324,10 @@ async function renderIdCard({ theme, number, name, gender, domisili, hobi, statu
   ctx.globalAlpha = 1;
 
   const pad = 34;
-  const x = pad, y = pad, cw = w - pad * 2, ch = h - pad * 2;
+  const x = pad,
+    y = pad,
+    cw = w - pad * 2,
+    ch = h - pad * 2;
 
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,.35)";
@@ -473,7 +507,10 @@ async function renderHouseCard({ choice, name, gender, hovId, avatarUrl }) {
   drawParticles(ctx, { x: 0, y: 0, w, h }, isDark ? "dark" : "light");
 
   const pad = 26;
-  const x = pad, y = pad, cw = w - pad * 2, ch = h - pad * 2;
+  const x = pad,
+    y = pad,
+    cw = w - pad * 2,
+    ch = h - pad * 2;
 
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,.35)";
@@ -673,8 +710,19 @@ function sortingPanelRow() {
 }
 
 // ===================== READY / PRESENCE =====================
-client.once(Events.ClientReady, (c) => {
+client.once(Events.ClientReady, async (c) => {
   console.log(`ONLINE AS: ${c.user.tag} | ID: ${c.user.id}`);
+
+  // Debug env biar gak “katanya udah diisi” tapi ternyata beda process/.env
+  console.log("[ENV]", {
+    GUILD_ID: requireEnv("GUILD_ID"),
+    MENFESS_CHANNEL_ID: requireEnv("MENFESS_CHANNEL_ID"),
+    SORTING_CHANNEL_ID: requireEnv("SORTING_CHANNEL_ID"),
+    HOUSECARD_CHANNEL_ID: requireEnv("HOUSECARD_CHANNEL_ID"),
+    IDCARD_CHANNEL_ID: requireEnv("IDCARD_CHANNEL_ID"),
+    LIGHT_ROLE_ID: requireEnv("LIGHT_ROLE_ID"),
+    DARK_ROLE_ID: requireEnv("DARK_ROLE_ID"),
+  });
 
   const statuses = ["🌙 menjaga gerbang realm", "🔮 merapalkan pesan welcome", "🕯️ menemani kalian ngobrol", "✨ ketik /halo untuk menyapa"];
   let i = 0;
@@ -694,9 +742,10 @@ client.once(Events.ClientReady, (c) => {
 
 // ===================== AUTO WELCOME =====================
 client.on(Events.GuildMemberAdd, async (member) => {
-  const channel = await getChannelById(member.guild, process.env.GENERAL_CHANNEL_ID);
-  if (!channel) return;
+  const res = await getTextChannelOrExplain(member.guild, requireEnv("GENERAL_CHANNEL_ID"));
+  if (!res.ok) return;
 
+  const channel = res.channel;
   const mention = `<@${member.id}>`;
   const guildName = `**${member.guild.name}**`;
   const msg = WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)](mention, guildName);
@@ -749,8 +798,12 @@ client.on(Events.MessageCreate, async (message) => {
 // ===================== HOUSECARD POST =====================
 async function postHouseCard(guild, user, choice) {
   const houseChId = requireEnv("HOUSECARD_CHANNEL_ID");
-  const houseChannel = await getChannelById(guild, houseChId);
-  if (!houseChannel) return false;
+  const res = await getTextChannelOrExplain(guild, houseChId);
+  if (!res.ok) {
+    console.error("[HOUSECARD] channel error:", explainChannelError(res));
+    return false;
+  }
+  const houseChannel = res.channel;
 
   const idDb = loadIdDB();
   const idData = idDb.users?.[user.id];
@@ -797,6 +850,9 @@ async function postHouseCard(guild, user, choice) {
 // ===================== INTERACTIONS =====================
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
+    // FIX: anti double-ack (40060) kalau ada handler/proses dobel
+    if (interaction.replied || interaction.deferred) return;
+
     // ===================== SLASH =====================
     if (interaction.isChatInputCommand()) {
       const name = interaction.commandName;
@@ -900,7 +956,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
 
       if (name === "registry") {
-        if (!interaction.guild) return interaction.reply({ content: "Command ini cuma bisa dipakai di server ya.", ephemeral: true });
+        if (!interaction.guild) return interaction.reply({ content: "Command ini cuma bisa dipakai di server ya.", flags: MessageFlags.Ephemeral });
+
         await interaction.guild.members.fetch({ withPresences: false }).catch(() => null);
 
         const idDb = loadIdDB();
@@ -915,7 +972,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       if (name === "serverinfo") {
         const g = interaction.guild;
-        if (!g) return interaction.reply({ content: "Ini cuma bisa dipakai di server ya 👀", ephemeral: true });
+        if (!g) return interaction.reply({ content: "Ini cuma bisa dipakai di server ya 👀", flags: MessageFlags.Ephemeral });
 
         const owner = await g.fetchOwner().catch(() => null);
         const channels = await g.channels.fetch().catch(() => g.channels.cache);
@@ -946,16 +1003,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       if (name === "menfesspanel") {
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-          return interaction.reply({ content: "command ini cuma buat admin ya 👀", ephemeral: true });
+          return interaction.reply({ content: "command ini cuma buat admin ya 👀", flags: MessageFlags.Ephemeral });
         }
 
-        const ch = await getChannelById(interaction.guild, process.env.MENFESS_CHANNEL_ID);
-        if (!ch) {
+        const res = await getTextChannelOrExplain(interaction.guild, requireEnv("MENFESS_CHANNEL_ID"));
+        if (!res.ok) {
           return interaction.reply({
-            content: "MENFESS_CHANNEL_ID tidak ketemu / bot tidak punya akses / bukan text channel.",
-            ephemeral: true,
+            content: `⚠️ MENFESS panel gagal: ${explainChannelError(res)}`,
+            flags: MessageFlags.Ephemeral,
           });
         }
+        const ch = res.channel;
 
         const embed = new EmbedBuilder()
           .setTitle("🕯️ MENFESS")
@@ -968,7 +1026,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         );
 
         await ch.send({ embeds: [embed], components: [row], allowedMentions: { parse: [] } });
-        return interaction.reply({ content: "✅ panel menfess terkirim ke channel menfess.", ephemeral: true });
+        return interaction.reply({ content: "✅ panel menfess terkirim ke channel menfess.", flags: MessageFlags.Ephemeral });
       }
 
       if (name === "idcard") {
@@ -987,26 +1045,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       if (name === "sortingpanel") {
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-          return interaction.reply({ content: "command ini cuma buat admin ya 👀", ephemeral: true });
+          return interaction.reply({ content: "command ini cuma buat admin ya 👀", flags: MessageFlags.Ephemeral });
         }
 
-        const targetChannelId = process.env.SORTING_CHANNEL_ID || interaction.channelId;
-        const ch = await getChannelById(interaction.guild, targetChannelId);
-
-        if (!ch) {
+        const targetChannelId = requireEnv("SORTING_CHANNEL_ID") || interaction.channelId;
+        const res = await getTextChannelOrExplain(interaction.guild, targetChannelId);
+        if (!res.ok) {
           return interaction.reply({
-            content: "SORTING_CHANNEL_ID tidak valid / bot tidak punya akses / bukan text channel.",
-            ephemeral: true,
+            content: `⚠️ Sorting panel gagal: ${explainChannelError(res)}`,
+            flags: MessageFlags.Ephemeral,
           });
         }
 
-        await ch.send({
+        await res.channel.send({
           embeds: [sortingPanelEmbed()],
           components: [sortingPanelRow()],
           allowedMentions: { parse: [] },
         });
 
-        return interaction.reply({ content: "✅ panel sorting terkirim.", ephemeral: true });
+        return interaction.reply({ content: "✅ panel sorting terkirim.", flags: MessageFlags.Ephemeral });
       }
 
       // ✅ /myhouse (PUBLIC + bisa lihat orang lain)
@@ -1075,7 +1132,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         });
       }
 
-      // penting: stop di sini, jangan lanjut ke button handler
       return;
     }
 
@@ -1105,14 +1161,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.message.edit({ embeds: [embed], components: [row], allowedMentions: { parse: [] } });
       }
 
-      // ✅ SORTING ROLL: kalau belum punya ID Card => cuma kasih pesan (no modal/ritual)
+      // ✅ SORTING ROLL
       if (id === "sorting:roll") {
         const lightRoleId = requireEnv("LIGHT_ROLE_ID");
         const darkRoleId = requireEnv("DARK_ROLE_ID");
         const idcardChannelId = requireEnv("IDCARD_CHANNEL_ID");
 
         if (!lightRoleId || !darkRoleId) {
-          return interaction.reply({ content: "⚠️ LIGHT_ROLE_ID / DARK_ROLE_ID belum diisi di .env", ephemeral: true });
+          return interaction.reply({
+            content: `⚠️ LIGHT_ROLE_ID / DARK_ROLE_ID kosong.\n(light=${String(lightRoleId)} dark=${String(darkRoleId)})`,
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        // FIX: pastikan role beneran ada di guild ini
+        const rLight = await getRoleOrExplain(interaction.guild, lightRoleId);
+        const rDark = await getRoleOrExplain(interaction.guild, darkRoleId);
+        if (!rLight.ok || !rDark.ok) {
+          const msg = [
+            "⚠️ Role Sorting bermasalah:",
+            !rLight.ok ? `• Light: ${explainRoleError(rLight)}` : null,
+            !rDark.ok ? `• Dark: ${explainRoleError(rDark)}` : null,
+            "",
+            "Biasanya: role ID dari server lain / role lama kehapus lalu dibuat ulang.",
+          ]
+            .filter(Boolean)
+            .join("\n");
+          return interaction.reply({ content: msg, flags: MessageFlags.Ephemeral });
         }
 
         const locked = getSortedUser(interaction.user.id);
@@ -1121,7 +1196,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           const text = locked.choice === "light" ? "<:light:1452229058841542748> Light Arcana" : "<:dark:1452229004663849052> Dark Arcana";
           return interaction.reply({
             content: `🔒 Kamu sudah tersortir ke **${text}**.\nSejak: <t:${when}:F>\n\nTidak bisa sorting ulang.`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
 
@@ -1132,12 +1207,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
           const mention = idcardChannelId ? `<#${idcardChannelId}>` : "channel ID Card";
           return interaction.reply({
             content: `⚠️ Kamu belum buat **Valerie ID Card**.\nSilahkan buat dulu di ${mention} dengan command **/idcard**.\n\nSetelah itu balik lagi dan klik **Mulai Ritual**.`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
 
         // lanjut ritual
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const stages = [
           "🕯️ Lingkaran arcane menyala…",
@@ -1160,6 +1235,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (!member) return interaction.editReply({ content: "⚠️ Gagal fetch member." });
 
         const roleIdToAdd = choice === "light" ? lightRoleId : darkRoleId;
+
+        // pastikan bot bisa manage roles
         await member.roles.add(roleIdToAdd).catch((e) => console.error("[SORTING] add role failed:", e));
 
         const finalText = choice === "light" ? "<:light:1452229058841542748> **LIGHT ARCANE**" : "<:dark:1452229004663849052> **DARK ARCANE**";
@@ -1173,7 +1250,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
-      // MENFESS new
+      // MENFESS new (open modal)
       if (id === "menfess:new") {
         const cdSec = Number(process.env.MENFESS_COOLDOWN_SEC || 60);
         const now = Date.now();
@@ -1181,7 +1258,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         if (now - last < cdSec * 1000) {
           const wait = Math.ceil((cdSec * 1000 - (now - last)) / 1000);
-          return interaction.reply({ content: `⏳ tunggu ${wait}s dulu ya.`, ephemeral: true });
+          return interaction.reply({ content: `⏳ tunggu ${wait}s dulu ya.`, flags: MessageFlags.Ephemeral });
         }
 
         const modal = new ModalBuilder().setCustomId("menfess:submit").setTitle("✉️ Menfess Anon");
@@ -1232,7 +1309,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.showModal(modal);
       }
 
-      // ID Card open (fitur lama tetap)
+      // ID Card open
       if (id === "idcard:open") {
         const modal = new ModalBuilder().setCustomId("idcard:submit").setTitle(`🪪 ${ID_CARD_TITLE}`);
 
@@ -1274,21 +1351,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       // MENFESS submit
       if (id === "menfess:submit") {
-        const ch = await getChannelById(interaction.guild, process.env.MENFESS_CHANNEL_ID);
-        if (!ch) {
+        const res = await getTextChannelOrExplain(interaction.guild, requireEnv("MENFESS_CHANNEL_ID"));
+        if (!res.ok) {
           return interaction.reply({
-            content: "Channel menfess tidak ketemu / bot tidak punya akses / bukan text channel.",
-            ephemeral: true,
+            content: `⚠️ Menfess gagal: ${explainChannelError(res)}`,
+            flags: MessageFlags.Ephemeral,
           });
         }
+        const ch = res.channel;
 
         const to = interaction.fields.getTextInputValue("to_initial").trim();
         const aliasRaw = (interaction.fields.getTextInputValue("alias") || "").trim();
         const content = interaction.fields.getTextInputValue("msg").trim();
 
-        if (!to || !content) return interaction.reply({ content: "Form kosong 😭", ephemeral: true });
+        if (!to || !content) return interaction.reply({ content: "Form kosong 😭", flags: MessageFlags.Ephemeral });
         if (aliasRaw && isBadAlias(aliasRaw)) {
-          return interaction.reply({ content: "Nama tidak boleh mengandung mention / nyamar staff ya.", ephemeral: true });
+          return interaction.reply({ content: "Nama tidak boleh mengandung mention / nyamar staff ya.", flags: MessageFlags.Ephemeral });
         }
 
         const cdSec = Number(process.env.MENFESS_COOLDOWN_SEC || 60);
@@ -1296,7 +1374,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const last = menfessCooldown.get(interaction.user.id) || 0;
         if (now - last < cdSec * 1000) {
           const wait = Math.ceil((cdSec * 1000 - (now - last)) / 1000);
-          return interaction.reply({ content: `⏳ tunggu ${wait}s dulu ya.`, ephemeral: true });
+          return interaction.reply({ content: `⏳ tunggu ${wait}s dulu ya.`, flags: MessageFlags.Ephemeral });
         }
         menfessCooldown.set(interaction.user.id, now);
 
@@ -1325,21 +1403,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
         db2.posts[String(menfessId)] = { messageId: sent.id, channelId: ch.id };
         saveMenfessDB(db2);
 
-        return interaction.reply({ content: "✅ menfess terkirim.", ephemeral: true });
+        return interaction.reply({ content: "✅ menfess terkirim.", flags: MessageFlags.Ephemeral });
       }
 
       // MENFESS reply submit
       if (id.startsWith("menfess:reply_submit:")) {
         const menfessId = id.split(":")[2];
         const replyText = interaction.fields.getTextInputValue("reply_msg").trim();
-        if (!replyText) return interaction.reply({ content: "Balasan kosong 😭", ephemeral: true });
+        if (!replyText) return interaction.reply({ content: "Balasan kosong 😭", flags: MessageFlags.Ephemeral });
 
         const db = loadMenfessDB();
         const post = db.posts[String(menfessId)];
-        if (!post) return interaction.reply({ content: "Menfess asal tidak ditemukan (mungkin sudah kehapus).", ephemeral: true });
+        if (!post) return interaction.reply({ content: "Menfess asal tidak ditemukan (mungkin sudah kehapus).", flags: MessageFlags.Ephemeral });
 
-        const ch = await getChannelById(interaction.guild, post.channelId);
-        if (!ch) return interaction.reply({ content: "Channel menfess tidak valid / bot tidak punya akses.", ephemeral: true });
+        const res = await getTextChannelOrExplain(interaction.guild, post.channelId);
+        if (!res.ok) return interaction.reply({ content: `⚠️ Reply gagal: ${explainChannelError(res)}`, flags: MessageFlags.Ephemeral });
+
+        const ch = res.channel;
 
         const anon = getAnonLabel(db, interaction.user.id);
         saveMenfessDB(db);
@@ -1357,10 +1437,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
           allowedMentions: { repliedUser: false, parse: [] },
         });
 
-        return interaction.reply({ content: "✅ balasan terkirim.", ephemeral: true });
+        return interaction.reply({ content: "✅ balasan terkirim.", flags: MessageFlags.Ephemeral });
       }
 
-      // ID CARD submit (fitur lama tetap)
+      // ID CARD submit
       if (id === "idcard:submit") {
         const rawName = interaction.fields.getTextInputValue("name");
         const rawGender = interaction.fields.getTextInputValue("gender");
@@ -1438,7 +1518,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   } catch (err) {
     console.error(err);
     if (!interaction.replied && !interaction.deferred) {
-      return interaction.reply({ content: "⚠️ ada error di bot, coba lagi ya.", ephemeral: true });
+      return interaction.reply({ content: "⚠️ ada error di bot, coba lagi ya.", flags: MessageFlags.Ephemeral });
     }
   }
 });
